@@ -1,4 +1,5 @@
 import json
+import datetime
 
 HISTORY_FILE = "data/routine_history.json"
 TEMPLATE_FILE = "data/routine_template.json"
@@ -62,7 +63,8 @@ def view_workout():
     else:
         for i, w in enumerate(workouts, start=1):
             print("---------------------------------")
-            print(f"{i}. {w['exercise']} - {w['sets']}x{w['reps']} @ {w['weight']}kg")
+            print(f"{i}. {w['exercise']} - "
+            f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
             print("---------------------------------")
 
 def remove_workout():
@@ -81,10 +83,32 @@ def remove_workout():
     else:
         print("Invalid option.")
 
-def get_max_volume(exercise):
+def view_history():
     try:
         with open(HISTORY_FILE, "r") as f:
             data = json.load(f)
+    except FileNotFoundError:
+        print("No previous workout history is found.")
+        return
+    except json.JSONDecodeError:
+        print("Workout history file is corrupted.")
+        return
+
+def get_max_volume(exercise):
+    max_volume = 0
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                session = json.loads(line)
+                for workout in session['exercises']:
+                    if workout['exercise'] == exercise:
+                        volume = (workout['weight'] *
+							workout['sets'] *
+							workout['reps'])
+                        if volume > max_volume:
+                            max_volume = volume
     except FileNotFoundError:
         print("No previous workout history is found.")
         return 0
@@ -92,34 +116,27 @@ def get_max_volume(exercise):
         print("Workout history file is corrupted.")
         return 0
 
-    max_volume = 0
-
-    for workout in data:
-        if workout['exercise'] == exercise:
-            volume = workout['weight'] * workout['sets'] * workout['reps']
-            if volume > max_volume:
-                max_volume = volume
-    
     return max_volume
 
 def get_max_weight(exercise):
+    max_weight = 0
     try:
         with open(HISTORY_FILE, "r") as f:
-            data = json.load(f)
+            for line in f:
+                if not line.strip():
+                    continue
+                session = json.loads(line)
+                for workout in session['exercises']:
+                    if workout['exercise'] == exercise:
+                        weight = workout['weight']
+                        if weight > max_weight:
+                            max_weight = weight
     except FileNotFoundError:
         print("No previous workout history is found.")
         return 0
     except json.JSONDecodeError:
         print("Workout history file is corrupted.")
         return 0
-
-    max_weight = 0
-
-    for workout in data:
-        if workout['exercise'] == exercise:
-            weight = workout['weight']
-            if weight > max_weight:
-                max_weight = weight
 
     return max_weight
 
@@ -139,26 +156,27 @@ def start_routine():
             lines = f.readlines()
 
         if not lines:
-            print("No previous workout history is found.")
-        previous_session = json.loads(lines[-1])
+            previous_session = []
+        else:
+            previous_session = json.loads(lines[-1])
     except FileNotFoundError:
-        print("No workout history file is found.")
-        return
+        previous_session = []
     except json.JSONDecodeError:
         print("Workout history file is corrupted.")
         return
 
+    session_records = 0
     session_workout = []
     for ex in routine:
         print(f"Exercise: {ex}")
         previous_weight = next((e['weight']
-                                for e in previous_session
+                                for e in previous_session['exercises']
                                 if e['exercise'] == ex), None)
         previous_set = next((e['sets']
-                             for e in previous_session
+                             for e in previous_session['exercises']
                              if e['exercise'] == ex), None)
         previous_rep = next((e['reps']
-                             for e in previous_session
+                             for e in previous_session['exercises']
                              if e['exercise'] == ex), None)
 
         print(f"Previous weight:", previous_weight, "|", end=" ")
@@ -172,10 +190,12 @@ def start_routine():
         max_volume = get_max_volume(ex)
         max_weight = get_max_weight(ex)
 
-        if (weight > max_weight) or
-        (weight == previous_weight and reps > previous_rep) or
-        (current_volume > max_volume):
-            print("Congratulations! You hit a new personal record!")
+        if weight > max_weight:
+            print("Congratulations! You've hit a new weight PR!")
+            session_records += 1
+        if current_volume > max_volume:
+            print("Congratulations! You've hit a new volume PR!")
+            session_records += 1
 
         workout = {
                 "exercise": ex,
@@ -185,12 +205,32 @@ def start_routine():
                 }
         session_workout.append(workout)
     
-    with open("routine_history.json", "a") as f:
-        json.dump(session_workout, f)
+    session_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    session_data = {
+            "date": session_date,
+            "exercises": session_workout
+            }
+
+    with open("data/routine_history.json", "a") as f:
+        json.dump(session_data, f)
         f.write("\n")
 
+    total_volume = sum(w['weight']
+                       * w['sets']
+                       * w['reps'] for w in session_workout)
+    print("---------------------------------------------------------")
+    print("Session summary:")
+    print(f"{session_date} | Records: {session_records} | "
+    f"Total volume: {total_volume}kg")
+    print("---------------------------------------------------------")
+
+    for i, w in enumerate(session_workout, start=1):
+        print(f"{i}. {w['exercise']} - "
+              f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
+    print("---------------------------------------------------------")
+
 def clear_history():
-    open("routine_history.json", "w").close()
+    open("data/routine_history.json", "w").close()
 
 def main():
     print("Welcome to gym tracker 101")
