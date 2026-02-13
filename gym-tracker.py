@@ -72,13 +72,29 @@ def remove_workout():
         print("Invalid option.")
 
 def start_routine():
-    with open("routine_template.json", "r") as f:
-        routine = json.load(f)
+    try:
+        with open("routine_template.json", "r") as f:
+            routine = json.load(f)
+    except FileNotFoundError:
+        print("No saved routine template is found.")
+        return
+    except json.JSONDecodeError:
+        print("Routine template file is corrupted.")
+        return
 
-    with open("routine_history.json", "r") as f:
-        lines = f.readlines()
+    try:
+        with open("routine_history.json", "r") as f:
+            lines = f.readlines()
 
-    previous_session = json.loads(lines[-1])
+        if not lines:
+            print("No previous workout history is found.")
+        previous_session = json.loads(lines[-1])
+    except FileNotFoundError:
+        print("No workout history file is found.")
+        return
+    except json.JSONDecodeError:
+        print("Workout history file is corrupted.")
+        return
 
     session_workout = []
     for ex in routine:
