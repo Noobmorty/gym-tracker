@@ -1,5 +1,8 @@
 import json
 
+HISTORY_FILE = "data/routine_history.json"
+TEMPLATE_FILE = "data/routine_template.json"
+
 workouts = []
 routine_template = []
 
@@ -17,9 +20,16 @@ def get_float(prompt):
         except ValueError:
             print("Please enter a number!")
 
+def get_str(prompt):
+    while True:
+        try:
+            return str(input(prompt))
+        except ValueError:
+            print("Please enter a string!")
+
 def add_workout():
     while True:
-        exercise = input("Exercise name: ")
+        exercise = get_str("Exercise name: ")
         weight = get_float("Weight: ")
         sets = get_int("Number of sets: ")
         reps = get_int("Number of reps: ")
@@ -34,13 +44,13 @@ def add_workout():
 
         workouts.append(workout)
 
-        option = input("Add another workout? (y/n)")
+        option = get_str("Add another workout? (y/n)")
         if option == "n":
-            routineyn = input("Save this workout as a routine? (y/n)")
+            routineyn = get_str("Save this workout as a routine? (y/n)")
             if routineyn == "y":
-                with open("routine_history.json", "w") as f:
+                with open(HISTORY_FILE, "w") as f:
                     json.dump(workouts, f)
-                with open("routine_template.json", "w") as f:
+                with open(TEMPLATE_FILE, "w") as f:
                     json.dump(routine_template, f)
                 break
             elif routineyn == "n":
@@ -64,16 +74,58 @@ def remove_workout():
         print(f"{i}. {w['exercise']}")
         print("-----------------")
         
-    option = int(input("Enter the number of the exercise to remove: "))
+    option = get_int("Enter the number of the exercise to remove: ")
     if 1 <= option <= len(workouts):
         workouts.pop(option-1)
         print("Exercise removed.")
     else:
         print("Invalid option.")
 
+def get_max_volume(exercise):
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print("No previous workout history is found.")
+        return 0
+    except json.JSONDecodeError:
+        print("Workout history file is corrupted.")
+        return 0
+
+    max_volume = 0
+
+    for workout in data:
+        if workout['exercise'] == exercise:
+            volume = workout['weight'] * workout['sets'] * workout['reps']
+            if volume > max_volume:
+                max_volume = volume
+    
+    return max_volume
+
+def get_max_weight(exercise):
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print("No previous workout history is found.")
+        return 0
+    except json.JSONDecodeError:
+        print("Workout history file is corrupted.")
+        return 0
+
+    max_weight = 0
+
+    for workout in data:
+        if workout['exercise'] == exercise:
+            weight = workout['weight']
+            if weight > max_weight:
+                max_weight = weight
+
+    return max_weight
+
 def start_routine():
     try:
-        with open("routine_template.json", "r") as f:
+        with open(TEMPLATE_FILE, "r") as f:
             routine = json.load(f)
     except FileNotFoundError:
         print("No saved routine template is found.")
@@ -83,7 +135,7 @@ def start_routine():
         return
 
     try:
-        with open("routine_history.json", "r") as f:
+        with open(HISTORY_FILE, "r") as f:
             lines = f.readlines()
 
         if not lines:
@@ -99,13 +151,32 @@ def start_routine():
     session_workout = []
     for ex in routine:
         print(f"Exercise: {ex}")
-        print(f"Previous weight:", next((e['weight'] for e in previous_session if e['exercise'] == ex), None), end=" ")
-        weight = get_float("|| Weight: ")
-        print(f"Previous set:", next((e['sets'] for e in previous_session if e['exercise'] == ex), None), end=" ")
-        sets = get_int("|| Number of sets: ")
-        print(f"Previous rep:", next((e['reps'] for e in previous_session if e['exercise'] == ex), None), end=" ")
-        reps = get_int("|| Number of reps: ")
-    
+        previous_weight = next((e['weight']
+                                for e in previous_session
+                                if e['exercise'] == ex), None)
+        previous_set = next((e['sets']
+                             for e in previous_session
+                             if e['exercise'] == ex), None)
+        previous_rep = next((e['reps']
+                             for e in previous_session
+                             if e['exercise'] == ex), None)
+
+        print(f"Previous weight:", previous_weight, "|", end=" ")
+        print(f"Previous set:", previous_set, "|", end=" ")
+        print(f"Previous rep:", previous_rep)
+        weight = get_float("Weight: ")
+        sets = get_int("Number of sets: ")
+        reps = get_int("Number of reps: ")
+
+        current_volume = weight * sets * reps
+        max_volume = get_max_volume(ex)
+        max_weight = get_max_weight(ex)
+
+        if (weight > max_weight) or
+        (weight == previous_weight and reps > previous_rep) or
+        (current_volume > max_volume):
+            print("Congratulations! You hit a new personal record!")
+
         workout = {
                 "exercise": ex,
                 "weight": weight,
@@ -131,7 +202,7 @@ def main():
         print("5. Clear routine history")
         print("6. Exit")
 
-        choice = input("Choose: ")
+        choice = get_str("Choose: ")
 
         if choice == "1":
             add_workout()
