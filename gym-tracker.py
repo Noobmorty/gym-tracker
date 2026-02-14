@@ -1,5 +1,6 @@
 import json
 import datetime
+import time
 
 HISTORY_FILE = "data/routine_history.json"
 TEMPLATE_FILE = "data/routine_template.json"
@@ -86,7 +87,37 @@ def remove_workout():
 def view_history():
     try:
         with open(HISTORY_FILE, "r") as f:
-            data = json.load(f)
+            lines = f.readlines()
+            for line in reversed(lines):
+                if not line.strip():
+                    continue
+                session = json.loads(line)
+                print("------------------------------------------")
+                print(f"Session date: {session['date']}")
+                print("------------------------------------------")
+                total_seconds = session['time']
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                if hours > 0:
+                    print(f"Time: {hours}h {minutes}m {seconds}s", end="")
+                elif minutes > 0:
+                    print(f"Time: {minutes}m {seconds}s", end="")
+                else:
+                    print(f"Time: {seconds}s", end="")
+                for ex in session['exercises']:
+                    total_volume = sum(ex['weight'] *
+										ex['sets'] *
+										ex['reps'] for ex in
+										session['exercises'])
+                print(f" | Volume: {total_volume}kg | "
+                f"Records: {session['records']}")
+                print("------------------------------------------")
+                for i, w in enumerate(session['exercises'], start=1):
+                    print(f"{i}. {w['exercise']} - "
+                          f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
+                print("------------------------------------------")
+	
     except FileNotFoundError:
         print("No previous workout history is found.")
         return
@@ -156,17 +187,29 @@ def start_routine():
             lines = f.readlines()
 
         if not lines:
-            previous_session = []
+            previous_session = {
+                    "date": None,
+                    "time": None,
+                    "records": None,
+                    "exercises": []
+                    }
         else:
             previous_session = json.loads(lines[-1])
     except FileNotFoundError:
-        previous_session = []
+        previous_session = {
+                "date": None,
+                "time": None,
+                "records": None,
+                "exercises": []
+                }
     except json.JSONDecodeError:
         print("Workout history file is corrupted.")
         return
 
     session_records = 0
     session_workout = []
+
+    start_time = time.perf_counter()
     for ex in routine:
         print(f"Exercise: {ex}")
         previous_weight = next((e['weight']
@@ -205,9 +248,13 @@ def start_routine():
                 }
         session_workout.append(workout)
     
+    end_time = time.perf_counter()
+    total_seconds = int(end_time - start_time)
     session_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     session_data = {
             "date": session_date,
+            "time": total_seconds,
+            "records": session_records,
             "exercises": session_workout
             }
 
@@ -218,16 +265,26 @@ def start_routine():
     total_volume = sum(w['weight']
                        * w['sets']
                        * w['reps'] for w in session_workout)
-    print("---------------------------------------------------------")
+    print("------------------------------------------")
     print("Session summary:")
-    print(f"{session_date} | Records: {session_records} | "
-    f"Total volume: {total_volume}kg")
-    print("---------------------------------------------------------")
-
+    print("------------------------------------------")
+    print(f"{session_date}")
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if hours > 0:
+        print(f"Time: {hours}h {minutes}m {seconds}s", end="")
+    elif minutes > 0:
+        print(f"Time: {minutes}m {seconds}s", end="")
+    else:
+        print(f"Time: {seconds}s", end="")
+    print(f" | Volume: {total_volume}kg | "
+    f"Records: {session_records}")
+    print("------------------------------------------")
     for i, w in enumerate(session_workout, start=1):
         print(f"{i}. {w['exercise']} - "
               f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
-    print("---------------------------------------------------------")
+    print("------------------------------------------")
 
 def clear_history():
     open("data/routine_history.json", "w").close()
@@ -239,8 +296,9 @@ def main():
         print("2. Remove workout")
         print("3. View workouts")
         print("4. Start routine")
-        print("5. Clear routine history")
-        print("6. Exit")
+        print("5. View workout history")
+        print("6. Clear workout history")
+        print("7. Exit")
 
         choice = get_str("Choose: ")
 
@@ -257,9 +315,12 @@ def main():
             start_routine()
 
         elif choice == "5":
-            clear_history()
+            view_history()
 
         elif choice == "6":
+            clear_history()
+
+        elif choice == "7":
             break
 
         else:

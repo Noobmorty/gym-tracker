@@ -6,5 +6,6 @@ Features:
 - Add workouts
 - Remove workouts
 - View workouts
-- Save routines
-- Track workout history
+- Start routines
+- View workout history
+- Clear workout history
