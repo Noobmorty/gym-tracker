@@ -72,46 +72,60 @@ def add_workout():
             print("Workout history file is corrupted.")
             return
 
-        option = get_str("Add another workout? (y/n)")
+        option = get_str("Add another workout? (y/n) ")
         if option == "n":
             end_time = time.perf_counter()
             total_seconds = int(end_time - start_time)
-            workouts = {
+            session_workout = {
                     "date": session_date,
                     "time": total_seconds,
                     "records": session_record,
                     "exercises": workouts
                     }
             with open(HISTORY_FILE, "a") as f:
-                json.dump(workouts, f)
+                json.dump(session_workout, f)
                 f.write("\n")
             break
 
-def view_workout():
-    if not workouts:
-        print("No workout has been added yet.")
+    total_volume = sum(w['weight']
+                       * w['sets']
+                       * w['reps'] for w in workouts)
+    print("------------------------------------------")
+    print("Session summary:")    
+    print("------------------------------------------")
+    print(f"{session_date}")
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if hours > 0:
+        print(f"Time: {hours}h {minutes}m {seconds}s", end="")
+    elif minutes > 0:
+        print(f"Time: {minutes}m {seconds}s", end="")
     else:
-        for i, w in enumerate(workouts, start=1):
-            print("---------------------------------")
-            print(f"{i}. {w['exercise']} - "
-            f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
-            print("---------------------------------")
-
-def remove_workout():
-    if not workouts:
-        print("No workout has been added yet.")
-
+        print(f"Time: {seconds}s", end="")
+    print(f" | Volume: {total_volume}kg | "
+          f"Records: {session_record}")
+    print("------------------------------------------")
     for i, w in enumerate(workouts, start=1):
-        print("-----------------")
-        print(f"{i}. {w['exercise']}")
-        print("-----------------")
-        
-    option = get_int("Enter the number of the exercise to remove: ")
-    if 1 <= option <= len(workouts):
-        workouts.pop(option-1)
-        print("Exercise removed.")
-    else:
-        print("Invalid option.")
+        print(f"{i}. {w['exercise']} - "
+              f"{w['sets']}x{w['reps']} @ {w['weight']}kg")
+    print("------------------------------------------")
+
+def new_routine():
+    exercises = []
+    routine_name = get_str("Routine title: ")
+    while True:
+        exercise = get_str("Exercise name: ")
+        exercises.append(exercise)
+        opt = get_str("Add another exercise? (y/n) ")
+        if opt == "n":
+            routine_template = {
+                    routine_name: exercises
+                    }
+            with open(TEMPLATE_FILE, "a") as f:
+                json.dump(routine_template, f)
+                f.write("\n")
+            break
 
 def view_history():
     try:
@@ -201,9 +215,18 @@ def get_max_weight(exercise):
     return max_weight
 
 def start_routine():
+    routine_list = []
+    number_of_routine = 0
     try:
         with open(TEMPLATE_FILE, "r") as f:
-            routine = json.load(f)
+            for line in f:
+                if not line.strip():
+                    continue
+                routines = json.loads(line)
+                for routine_name, exercises in routines.items():
+                    print(f"{len(routine_list)+1}. {routine_name}")
+                    routine_list.append((routine_name, exercises))
+                    number_of_routine += 1
     except FileNotFoundError:
         print("No saved routine template is found.")
         return
@@ -235,6 +258,15 @@ def start_routine():
         print("Workout history file is corrupted.")
         return
 
+    while True:
+        opt = get_int("Choose the routine number you want to proceed with. ")
+        if opt < 1 or opt > number_of_routine:
+            print("Please enter a valid routine number!")
+        else:
+            break
+
+    routine_name, routine = routine_list[opt-1]
+    
     session_records = 0
     session_workout = []
 
@@ -321,13 +353,12 @@ def clear_history():
 def main():
     print("Welcome to gym tracker 101")
     while True:
-        print("1. Add workout")
-        print("2. Remove workout")
-        print("3. View workouts")
-        print("4. Start routine")
-        print("5. View workout history")
-        print("6. Clear workout history")
-        print("7. Exit")
+        print("1. Start new workout")
+        print("2. New routine")
+        print("3. Start routine")
+        print("4. View workout history")
+        print("5. Clear workout history")
+        print("6. Exit")
 
         choice = get_str("Choose: ")
 
@@ -335,21 +366,18 @@ def main():
             add_workout()
 
         elif choice == "2":
-            remove_workout()
+            new_routine()
 
         elif choice == "3":
-            view_workout()
-
-        elif choice == "4":
             start_routine()
 
-        elif choice == "5":
+        elif choice == "4":
             view_history()
 
-        elif choice == "6":
+        elif choice == "5":
             clear_history()
 
-        elif choice == "7":
+        elif choice == "6":
             break
 
         else:
