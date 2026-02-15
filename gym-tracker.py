@@ -5,7 +5,6 @@ import time
 HISTORY_FILE = "data/routine_history.json"
 TEMPLATE_FILE = "data/routine_template.json"
 
-workouts = []
 routine_template = []
 
 def get_int(prompt):
@@ -30,33 +29,63 @@ def get_str(prompt):
             print("Please enter a string!")
 
 def add_workout():
+    workouts = []
+    session_record = 0
+    session_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    start_time = time.perf_counter()
     while True:
         exercise = get_str("Exercise name: ")
         weight = get_float("Weight: ")
         sets = get_int("Number of sets: ")
         reps = get_int("Number of reps: ")
 
-        routine_template.append(exercise)
         workout = {
                 "exercise": exercise,
                 "weight": weight,
                 "sets": sets,
                 "reps": reps
                 }
-
         workouts.append(workout)
+
+        current_volume = weight * sets * reps
+        
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    session = json.loads(line)
+                    for workout in session['exercises']:
+                        if workout['exercise'] == exercise:
+                            if weight > get_max_weight(exercise):
+                                session_record += 1
+                            if current_volume > get_max_volume(exercise):
+                                session_record += 1
+        except FileNotFoundError:
+            previous_session = {
+                    "date": None,
+                    "time": None,
+                    "records": None,
+                    "exercises": []
+                    }
+        except json.JSONDecodeError:
+            print("Workout history file is corrupted.")
+            return
 
         option = get_str("Add another workout? (y/n)")
         if option == "n":
-            routineyn = get_str("Save this workout as a routine? (y/n)")
-            if routineyn == "y":
-                with open(HISTORY_FILE, "w") as f:
-                    json.dump(workouts, f)
-                with open(TEMPLATE_FILE, "w") as f:
-                    json.dump(routine_template, f)
-                break
-            elif routineyn == "n":
-                break
+            end_time = time.perf_counter()
+            total_seconds = int(end_time - start_time)
+            workouts = {
+                    "date": session_date,
+                    "time": total_seconds,
+                    "records": session_record,
+                    "exercises": workouts
+                    }
+            with open(HISTORY_FILE, "a") as f:
+                json.dump(workouts, f)
+                f.write("\n")
+            break
 
 def view_workout():
     if not workouts:
@@ -258,7 +287,7 @@ def start_routine():
             "exercises": session_workout
             }
 
-    with open("data/routine_history.json", "a") as f:
+    with open(HISTORY_FILE, "a") as f:
         json.dump(session_data, f)
         f.write("\n")
 
